@@ -1,0 +1,160 @@
+# Plotting world maps for Order specimen count and inventory completeness
+# Noah Hearne
+# July, 2021
+
+#---------------------------------
+# Load extra libraries
+library(tidyverse)
+library(sf)
+library(rgeos)
+library(rgdal)
+library(Hmisc)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(ggplot2)
+library(readxl)
+library(ggpubr)
+
+# Load Order data from 01b-Counting
+mapsBirdOrder <- read.csv("Data/MapData3.csv") 
+mapsBirdOrder <- filter(mapsBirdOrder, !is.na(countryCode))
+mapsMammalOrder <- read.csv("Data/MapData4.csv")
+mapsMammalOrder <- filter(mapsMammalOrder, !is.na(countryCode))
+countryOrder <- read.csv("Data/MapData5.csv") 
+
+# Combine data with longitude and latitude for centroids
+centroids <- read_excel("Data/Centroids.xlsx")
+centroids <- rename(centroids, "countryCode" = "ISO_2DIGIT") # Changes column name
+centroids["142", "countryCode"] <- "NM" # Renames Namibia country code
+mydataBO <- left_join(mapsBirdOrder, centroids, by = "countryCode") %>% filter(!is.na(long)) %>% filter(!is.na(lat)) # Adds in countryCounts and removes long and lat NAs
+mydataMO <- left_join(mapsMammalOrder, centroids, by = "countryCode") %>% filter(!is.na(long)) %>% filter(!is.na(lat)) # Adds in countryCounts and removes long and lat NAs
+
+# Helper functions for plotting
+
+remove_y <- 
+  theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+remove_x <-   
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+
+#----------------------------------------------
+# First convert the lat long into "points" data for plotting
+mydata <-
+  mydata %>%
+  st_as_sf(coords = c("long", "lat"), crs = 4326) #%>% filter(!is.na(countryCode)) 
+# Converts long and lat to sf object using Coordinate Reference System
+
+#----------------------------------------------
+# Make a base map of the land
+#----------------------------------------------
+baseMap <- 
+  rnaturalearth::ne_countries(returnclass = 'sf') %>% # Returns world country polygons as sf class
+  st_union() # Combines the geometries of the countries
+
+baseBorderMap <- 
+  ne_countries(returnclass = 'sf') # Returns world country polygons as sf class
+baseBorderMap <- rename(baseBorderMap, "countryCode" = "iso_a2") # Renames countryCode column
+baseBorderMap["112", "countryCode"] <- "NM" # Renames Namibia country code
+mydataBO2 <- baseBorderMap %>% full_join(mydataBO, by = "countryCode") # Adds counts to map data (maybe something to do with fill needing data with borders?)
+mydataMO2 <- baseBorderMap %>% full_join(mydataMO, by = "countryCode") # Adds counts to map data (maybe something to do with fill needing data with borders?)
+
+# Combine specimen and map data
+mydata <- baseBorderMap %>% full_join(countryOrder, by = "countryCode") # Adds counts to map data (maybe something to do with fill needing data with borders?)
+mydata <- mydata %>% filter(is.na(!countryCode))
+mydata_m <- mydata %>% filter(class == "Mammals")
+mydata_b <- mydata %>% filter(class == "Birds")
+
+# Plot maps
+mammalOrderMap <- ggplot(data = baseBorderMap) + # Plots map for each mammal order
+                    geom_sf(data = baseBorderMap, lwd = 0) +
+                    geom_sf(data = mydata_m, aes(fill = log(specimens)), lwd = 0.3) + # Sets fill colour based on specimens from mydata2
+                    scale_fill_viridis_c() +
+                    theme_bw() +
+                    theme(legend.title = element_blank()) +
+                    facet_wrap(~order)
+
+birdOrderMap <- ggplot(data = baseBorderMap) + # Plots map for each bird order
+                  geom_sf(data = baseBorderMap, lwd = 0) +
+                  geom_sf(data = mydata_b, aes(fill = log(specimens)), lwd = 0.3) + # Sets fill colour based on specimens from mydata2
+                 scale_fill_viridis_c() +
+                 theme_bw() +
+                 theme(legend.title = element_blank()) +
+                 facet_wrap(~order)
+
+mammalOrderMap
+birdOrderMap
+
+# Save maps
+ggsave("Figures/mammalOrderMap.png", plot = mammalOrderMap, width = 25, height = 14, units = "cm") # Save maps
+ggsave("Figures/birdOrderMap.png", plot = birdOrderMap, width = 25, height = 14, units = "cm") # Save maps
+
+# Plot maps for inventory completeness
+propOrderMammal <- read.csv(file = "Data/MammalOrderIC.csv")
+propOrderBird <- read.csv(file = "Data/BirdOrderIC.csv")
+
+# Combine inventory completeness and map data
+mammalProp2 <- baseBorderMap %>% left_join(propOrderMammal, by = "countryCode") # Adds counts to map data (maybe something to do with fill needing data with borders?)
+mammalProp2 <- mammalProp2 %>% filter(!is.na(countryCode))
+mammalProp2 <- mammalProp2 %>% filter(mammalOrderProp <= 1)
+birdProp2 <- baseBorderMap %>% left_join(propOrderBird, by = "countryCode") # Adds counts to map data (maybe something to do with fill needing data with borders?)
+birdProp2 <- birdProp2 %>% filter(!is.na(countryCode))
+birdProp2 <- birdProp2 %>% filter(birdOrderProp <= 1)
+
+
+# If you only want to run these maps for the largest orders
+#birdSelectOrder <- filter(birdProp2, orderName %in% c("Passeriformes", "Caprimulgiformes", 
+                          # "Piciformes", "Psittaciformes", "Charadriiformes", "Columbiformes"))
+
+#mammalSelectOrder <- filter(mammalProp2, orderName %in% c("Rodentia", "Chiroptera", 
+                                                     # "Primates", "EULIPOTYPHLA", "Cetartiodactyla", "Carnivora"))
+
+# Plot maps
+birdOrderMap2 <- ggplot(data = baseBorderMap) + # Plots map for each order
+  geom_sf(data = baseBorderMap, lwd = 0) +
+  geom_sf(data = birdProp2, aes(fill = birdOrderProp), lwd = 0.3) + # Sets fill colour based on specimens from mydata2
+  scale_fill_viridis_c() +
+  theme_bw() +
+  theme(legend.title = element_blank()) +
+  facet_wrap(~orderName)
+
+# Save map
+#ggsave("Figures/birdOrderIC.png", plot = birdOrderMap2, width = 25, height = 14, units = "cm") # Save maps
+
+mammalOrderMap2 <- ggplot(data = baseBorderMap) + # Plots map for each order
+  geom_sf(data = baseBorderMap, lwd = 0) +
+  geom_sf(data = mammalProp2, aes(fill = mammalOrderProp), lwd = 0.3) + # Sets fill colour based on specimens from mydata2
+  scale_fill_viridis_c() +
+  theme_bw() +
+  theme(legend.title = element_blank()) +
+  facet_wrap(~orderName)
+
+# Save map
+#ggsave("Figures/mammalOrderIC.png", plot = mammalOrderMap2, width = 25, height = 14, units = "cm") # Save maps
+
+birdSelectOrder <- filter(birdProp2, orderName %in% c("Caprimulgiformes"))
+birdSelectOrder2 <- filter(birdProp2, orderName %in% c("Sphenisciformes"))
+
+birdOrderMap <- ggplot(data = baseBorderMap) + # Plots map for each order
+  geom_sf(data = baseBorderMap, lwd = 0) +
+  geom_sf(data = birdSelectOrder, aes(fill = birdOrderProp), lwd = 0.3) + # Sets fill colour based on specimens from mydata2
+  scale_fill_viridis_c() +
+  theme_bw() +
+  theme(legend.title = element_blank()) +
+  facet_wrap(~orderName)
+
+birdOrderMap2 <- ggplot(data = baseBorderMap) + # Plots map for each order
+  geom_sf(data = baseBorderMap, lwd = 0) +
+  geom_sf(data = birdSelectOrder2, aes(fill = birdOrderProp), lwd = 0.3) + # Sets fill colour based on specimens from mydata2
+  scale_fill_viridis_c() +
+  theme_bw() +
+  theme(legend.title = element_blank()) +
+  facet_wrap(~orderName)
+
+CSMaps <- ggarrange(birdOrderMap, birdOrderMap2, # Arrange specimen count maps
+                     ncol = 1, nrow = 2)
+CSMaps
+ggsave("Figures/CSMaps.png", plot = CSMaps, width = 22, height = 25, units = "cm")
