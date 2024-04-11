@@ -1,0 +1,156 @@
+# Ploting world maps for Class specimen count and inventory completeness
+# Noah Hearne
+# July, 2021
+
+#---------------------------------
+# Load libraries
+library(tidyverse)
+library(sf)
+library(rgeos)
+library(rgdal)
+library(Hmisc)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(ggplot2)
+library(readxl)
+library(ggpubr)
+
+# Read in data
+maps <- read.csv("Data/SpecModZ.csv") 
+maps <- filter(maps, !is.na(countryCode)) # Remove records with no country codes
+
+# Rename coloumns
+names(maps)[names(maps) == "birdSpecimens"] <- "birds"
+names(maps)[names(maps) == "mammalSpecimens"] <- "mammals"
+names(maps)[names(maps) == "totalSpecimens"] <- "total"
+
+# Helper functions for plotting
+
+remove_y <- 
+  theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+remove_x <-   
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+
+#----------------------------------------------
+# Make a base map of the land
+#----------------------------------------------
+baseBorderMap <- 
+  ne_countries(returnclass = 'sf') # Returns world country polygons as sf class
+baseBorderMap <- rename(baseBorderMap, "countryCode" = "iso_a2") # Renames countryCode column
+baseBorderMap["112", "countryCode"] <- "NM" # Renames Namibia country code
+baseBorderMap["88", "countryCode"] <- "XK" # Renames Kosovo country code
+mydata2 <- baseBorderMap %>% right_join(maps, by = "countryCode") # Adds counts to map data (maybe something to do with fill needing data with borders?)
+mydata2 <- mydata2 %>% # Makes blanks zeros for birds, mammals, and combined
+  mutate(total = coalesce(total, 0),
+         mammals = coalesce(mammals, 0),
+         birds = coalesce(birds, 0))
+
+### Is there spatial bias in the bird and mammal collections of the NHM London?
+# Bird specimens
+birdSpecm <- ggplot(data = baseBorderMap) + # Plots map
+  geom_sf(data = baseBorderMap, lwd = 0) +
+  geom_sf(data = mydata2, aes(fill = log(birds)), lwd = 0.3) + # Sets fill colour based on specimens from mydata2
+ # ggtitle("(a)") +
+  scale_fill_viridis_c() +
+  theme_bw() +
+  theme(legend.title = element_blank())
+
+# Mammal specimens
+mammalSpecm <- ggplot(data = baseBorderMap) + # Plots map
+  geom_sf(data = baseBorderMap, lwd = 0) +
+  geom_sf(data = mydata2, aes(fill = log(mammals)), lwd = 0.3) + # Sets fill colour based on specimens from mydata2
+  #ggtitle("(b)") +
+  scale_fill_viridis_c() +
+  theme_bw() +
+  theme(legend.title = element_blank())
+
+# Combined specimens
+totalSpecm <- ggplot(data = baseBorderMap) + # Plots map
+  geom_sf(data = baseBorderMap, lwd = 0) +
+  geom_sf(data = mydata2, aes(fill = log(total)), lwd = 0.3) + # Sets fill colour based on specimens from mydata2
+  #ggtitle("(c)") +
+  scale_fill_viridis_c() +
+  theme_bw() +
+  theme(legend.title = element_blank())
+
+birdSpecm
+mammalSpecm
+totalSpecm
+
+# Save individual maps (see below for combined figures)
+#ggsave("Figures/TotalSpecimens2.png", plot = totalSpecm)
+#ggsave("Figures/BirdSpecimens2.png", plot = birdSpecm)
+#ggsave("Figures/MammalSpecimens2.png", plot = mammalSpecm)
+
+
+#Again, for species
+maps2 <- read.csv("Data/ICMapData.csv") # Read in inventory completeness data
+maps2 <- filter(maps2, !is.na(countryCode)) # Remove records without country code
+
+#----------------------------------------------
+# Make a base map of the land
+#----------------------------------------------
+baseBorderMap <- 
+  ne_countries(returnclass = 'sf') # Returns world country polygons as sf class
+baseBorderMap <- rename(baseBorderMap, "countryCode" = "iso_a2") # Renames countryCode column
+baseBorderMap["112", "countryCode"] <- "NM" # Renames Namibia country code
+baseBorderMap["88", "countryCode"] <- "XK" # Renames Kosovo country code
+mydata5 <- baseBorderMap %>% right_join(maps2, by = "countryCode") # Adds counts to map data (maybe something to do with fill needing data with borders?)
+
+
+
+### Is there spatial bias in the bird and mammal collections of the NHM London?
+# Bird species
+birdSpeci <- ggplot(data = baseBorderMap) + # Plots map
+  geom_sf(data = baseBorderMap, lwd = 0) +
+  geom_sf(data = mydata5, aes(fill = birdSpecies/birdRichness), lwd = 0.3) + # Sets fill colour based on specimens from mydata2
+  ggtitle("(a)") +
+  scale_fill_viridis_c() +
+  theme_bw() +
+  theme(legend.title = element_blank())
+
+# Mammal species
+mammalSpeci <- ggplot(data = baseBorderMap) + # Plots map
+  geom_sf(data = baseBorderMap, lwd = 0) +
+  geom_sf(data = mydata5, aes(fill = mammalSpecies/mammalRichness), lwd = 0.3) + # Sets fill colour based on specimens from mydata2
+  ggtitle("(b)") +
+  scale_fill_viridis_c() +
+  theme_bw() +
+  theme(legend.title = element_blank())
+
+# Total species
+totalSpeci <- ggplot(data = baseBorderMap) + # Plots map
+  geom_sf(data = baseBorderMap, lwd = 0) +
+  geom_sf(data = mydata5, aes(fill = totalSpecies/totalRichness), lwd = 0.3) + # Sets fill colour based on specimens from mydata2
+  ggtitle("(c)") +
+  scale_fill_viridis_c() +
+  theme_bw() +
+  theme(legend.title = element_blank())
+
+
+birdSpeci
+mammalSpeci
+totalSpeci
+
+# Save individual maps (see below for saving figures)
+#ggsave("Figures/TotalSpecies2.png", plot = totalSpeci)
+#ggsave("Figures/BirdSpecies2.png", plot = birdSpeci)
+#ggsave("Figures/MammalSpecies2.png", plot = mammalSpeci)
+
+figure1 <- ggarrange(birdSpecm, mammalSpecm, totalSpecm, # Arrange specimen count maps
+                    ncol = 1, nrow = 3, widths = c(1, 0.05, 1))
+figure1
+figure2<- ggarrange(birdSpeci, mammalSpeci, totalSpeci, # Arrange inventory completeness maps
+                    ncol = 1, nrow = 3, widths = c(1, 0.05, 1))
+figure2
+
+# Save specimen count maps
+#ggsave("Figures/specimenMapsZ.png", figure1, width = 17, height = 25, units = "cm")
+
+# Save inventory completeness maps
+#ggsave("Figures/speciesMapsZ.png", figure2, width = 17, height = 25, units = "cm")
