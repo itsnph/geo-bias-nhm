@@ -1,0 +1,52 @@
+# Calculating the Inventory Completeness for each continent
+# Noah Hearne
+# August, 2021
+
+#---------------------------------
+
+# Load cleaned data
+ds2 <- read.csv("Data/CleanedData.csv")
+dataWZeros <- read.csv("Data/FinalDataWithZeros.csv") 
+continents <- read.csv("Data/continents.csv") # Load continent names
+continents <- filter(continents, !is.na(countryCode)) # Remove countrinents without country codes
+
+# Merge data with country code
+dataWZeros <- left_join(dataWZeros, continents, by = "countryCode")
+dataWZeros <- transform(dataWZeros, totalProp = totalSpecies / totalRichness) # Add column for total inventory completeness
+dataWZeros <- spread(dataWZeros, key = "continent", value = "totalProp")
+
+# Inventory completeness for each continent
+continentSpecies <- count(ds2, continent, binomial)
+continentSpecies <- count(continentSpecies, continent)
+names(continentSpecies)[names(continentSpecies) == "n"] <- "nhmSpecies"
+continentSpecies <- filter(continentSpecies, !is.na(continent))
+
+# Load IUCN species richness data
+# Mammals
+IUCN_m <- read_csv("Data/Country Species Richness/IUCN_Mammals/countries.csv")
+names(IUCN_m)[names(IUCN_m) == "code"] <- "countryCode"
+
+# Birds
+IUCN_b1 <- read_csv("Data/Country Species Richness/IUCN_Birds/countries1.csv")
+IUCN_b2 <- read_csv("Data/Country Species Richness/IUCN_Birds/countries2.csv")
+IUCN_b <- full_join(IUCN_b1, IUCN_b2)
+names(IUCN_b)[names(IUCN_b) == "code"] <- "countryCode"
+
+IUCN_b <- left_join(IUCN_b, continents, by = "countryCode")
+IUCN_m <- left_join(IUCN_m, continents, by = "countryCode")
+
+IUCN_bCounts <- count(IUCN_b, scientificName, continent)
+IUCN_bCounts <- count(IUCN_bCounts, continent)
+names(IUCN_bCounts)[names(IUCN_bCounts) == "n"] <- "birdSpecies"
+
+IUCN_mCounts <- count(IUCN_m, scientificName, continent)
+IUCN_mCounts <- count(IUCN_mCounts, continent)
+names(IUCN_mCounts)[names(IUCN_mCounts) == "n"] <- "mammalSpecies"
+
+IUCN_Counts <- left_join(IUCN_bCounts, IUCN_mCounts)
+IUCN_Counts <- transform(IUCN_Counts, totalSpecies = birdSpecies + mammalSpecies)
+
+# Calculate IC for each continent
+Counts <- left_join(continentSpecies, IUCN_Counts)
+Counts <- transform(Counts, invCom = nhmSpecies / totalSpecies) # Calculate inventory completeness for continents
+
