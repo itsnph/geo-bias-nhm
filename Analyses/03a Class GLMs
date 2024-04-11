@@ -1,0 +1,191 @@
+# Running GMLs for Class specimen counts and inventory completeness and additional datasets
+# Noah Hearne
+# June, 2021
+
+#---------------------------------
+
+# Load libraries
+library(tidyverse)
+library(sf)
+library(rgeos)
+library(rgdal)
+library(Hmisc)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(ggplot2)
+library(readxl)
+library(dplyr)
+library(car)
+library(psych)
+library(ggpubr)
+citation("psych")
+
+dataHDI <- read.csv("Data/FinalDataWithZeros.csv") 
+dataHDI2 <- read.csv("Data/FinalData.csv") 
+#dataHDI <- filter(dataHDI, !is.na(mammalSpecies) | !is.na(birdSpecies)) 
+
+dataHDI <- read.csv("Data/FinalDataWithZeros2.csv")
+
+all.equal(dataHDI,dataHDI2)
+
+## Is there spatial bias in the bird and mammal collections of the NHM London?
+
+## Are these biases related to the colonial history of the countries from which specimens in the collections originate?
+modTotal <- glm(formula = cbind(totalSpecies, totalRichness - totalSpecies)
+                 ~ col + landArea, family = binomial, data = dataHDI)
+summary(modTotal)
+18583/203 # Dispersion parameter
+
+modMam <- glm(formula = cbind(mammalSpecies, mammalRichness - mammalSpecies)
+               ~ col +  landArea, family = binomial, data = dataHDI)
+summary(modMam)
+5420.9/206 # Dispersion parameter
+
+modBird <- glm(formula = cbind(birdSpecies, birdRichness - birdSpecies)
+                ~ col + landArea, family = binomial, data = dataHDI)
+summary(modBird)
+18383/203 # Dispersion parameter
+
+# Fit with quasibinomial family
+modTotalq <- glm(formula = cbind(totalSpecies, totalRichness - totalSpecies)
+                  ~ col + landArea, family = quasibinomial, data = dataHDI)
+summary(modTotalq)
+1 - 18583/23039 # Pseudo R-squared
+Anova(modTotalq, type = c("II"), test.statistic = c("F"))
+
+
+modMamq <- glm(formula = cbind(mammalSpecies, mammalRichness - mammalSpecies)
+                ~ col + landArea, family = quasibinomial, data = dataHDI)
+summary(modMamq)
+1 - 5420.9/6890.1 # Pseudo R-squared
+Anova(modMamq, type = c("II"), test.statistic = c("F"))
+
+
+modBirdq <- glm(formula = cbind(birdSpecies, birdRichness - birdSpecies)
+                 ~ col + landArea, family = quasibinomial, data = dataHDI)
+summary(modBirdq)
+1 - 18383/21403 # Pseudo R-squared
+Anova(modBirdq, type = c("II"), test.statistic = c("F"))
+
+
+## Are these biases related to other factors, such as GDP, Global Peace Index, airport or road density? 
+# Check for collinearity
+pairs.panels(dataHDI[,c(4, 14, 15, 16, 17, 18, 19)])
+
+# Start with binomial models
+modTotal1 <- glm(formula = cbind(totalSpecies, totalRichness - totalSpecies)
+               ~ col + landArea + airDensity + roadDensity + officialEnglish + GPI + HDI, family = binomial, data = dataHDI)
+summary(modTotal1)
+14371/143 # Dispersion parater
+
+modMam1 <- glm(formula = cbind(mammalSpecies, mammalRichness - mammalSpecies)
+               ~ col + landArea + airDensity + roadDensity + officialEnglish + GPI + HDI, family = binomial, data = dataHDI)
+summary(modMam1)
+4105.7/143 # Dispersion parater
+
+modBird1 <- glm(formula = cbind(birdSpecies, birdRichness - birdSpecies)
+               ~ col + landArea + airDensity + roadDensity + officialEnglish + GPI + HDI, family = binomial, data = dataHDI)
+summary(modBird1)
+14461/143 # Dispersion parater
+
+# Fit with quasibinomial family
+modTotal1q <- glm(formula = cbind(totalSpecies, totalRichness - totalSpecies)
+                  ~ col + landArea + HDI + GPI + airDensity + officialEnglish, family = quasibinomial, data = dataHDI)
+summary(modTotal1q)
+1 - 14520/20166 # Pseudo R-squared
+Anova(modTotal1q, type = c("II"), test.statistic = c("F"))
+
+
+modMam1q <- glm(formula = cbind(mammalSpecies, mammalRichness - mammalSpecies)
+                ~ col + landArea + HDI + GPI + airDensity + officialEnglish, family = quasibinomial, data = dataHDI)
+summary(modMam1q)
+1 - 4109.6/5878.8 # Pseudo R-squared
+Anova(modMam1q, type = c("II"), test.statistic = c("F"))
+
+
+modBird1q <- glm(formula = cbind(birdSpecies, birdRichness - birdSpecies)
+                 ~ col + landArea + HDI + GPI + airDensity + officialEnglish, family = quasibinomial, data = dataHDI)
+summary(modBird1q)
+1 - 14669/19003 # Pseudo R-squared
+Anova(modBird1q, type = c("II"), test.statistic = c("F"))
+
+
+## Specimen number models
+# Question 2 for specimen numbers
+countryClassS <- read.csv(file = "Data/SpecModZ.csv")
+countryClassS2 <- left_join(dataHDI, countryClassS, by = "countryCode")
+summary(countryClassS)
+
+modBirdSpecimens <- glm(formula = birdSpecimens
+                ~ col + landArea, family = poisson, data = countryClassS2)
+summary(modBirdSpecimens)
+380316/197 # Dispersioon parameter
+
+modMammalSpecimens <- glm(formula = mammalSpecimens
+                          ~ col + landArea, family = poisson, data = countryClassS2)
+summary(modMammalSpecimens)
+300238/197 # Dispersioon parameter
+
+modTotalSpecimens <- glm(formula = totalSpecimens
+                         ~ col + landArea, family = poisson, data = countryClassS2)
+summary(modTotalSpecimens)
+577225/197 # Dispersioon parameter
+
+# Fit with quasipoisson family
+modBirdSpecimensQ <- glm(formula = birdSpecimens
+                        ~ col + landArea, family = quasipoisson, data = countryClassS2)
+summary(modBirdSpecimensQ)
+1 - (380316/446214) # Pseudo R-squared
+Anova(modBirdSpecimensQ, type = c("II"), test.statistic = c("F"))
+
+
+modMammalSpecimensQ <- glm(formula = mammalSpecimens
+                           ~ col + landArea, family = quasipoisson, data = countryClassS2)
+summary(modMammalSpecimensQ)
+1 - (300238/357271) # Pseudo R-squared
+Anova(modMammalSpecimensQ, type = c("II"), test.statistic = c("F"))
+
+
+modTotalSpecimensQ <- glm(formula = totalSpecimens
+                         ~ col + landArea, family = quasipoisson, data = countryClassS2)
+summary(modTotalSpecimensQ)
+1 - (577225/699297) # Pseudo R-squared
+Anova(modTotalSpecimensQ, type = c("II"), test.statistic = c("F"))
+
+
+# Question 3 for specimen numbers
+modBirdSpecimens1 <- glm(formula = birdSpecimens
+                 ~ col + landArea + airDensity + roadDensity + officialEnglish + GPI + HDI, family = poisson, data = countryClassS2)
+summary(modBirdSpecimens1)
+265564/141 # Dispersion parameter
+
+modMammalSpecimens1 <- glm(formula = mammalSpecimens
+               ~ col + landArea + airDensity + roadDensity + officialEnglish + GPI + HDI, family = poisson, data = countryClassS2)
+summary(modMammalSpecimens1)
+200632/141 # Dispersion parameter
+
+modTotalSpecimens1 <- glm(formula = totalSpecimens
+                ~ col + landArea + airDensity + roadDensity + officialEnglish + GPI + HDI, family = poisson, data = countryClassS2)
+summary(modTotalSpecimens1)
+380871/141 # Dispersion parameter
+
+# Fit with quasipoisson family
+modBirdSpecimens1q <- glm(formula = birdSpecimens
+                  ~ col + landArea + HDI + GPI + airDensity + officialEnglish, family = quasipoisson, data = countryClassS2)
+summary(modBirdSpecimens1q)
+1 - 271694/395788 # Pseudo R-squared
+Anova(modBirdSpecimens1q, type = c("II"), test.statistic = c("F"))
+
+
+modMammalSpecimens1q <- glm(formula = mammalSpecimens
+                ~ col + landArea + HDI + GPI + airDensity + officialEnglish, family = quasipoisson, data = countryClassS2)
+summary(modMammalSpecimens1q)
+1 - 204389/300711 # Pseudo R-squared
+Anova(modMammalSpecimens1q, type = c("II"), test.statistic = c("F"))
+
+
+modTotalSpecimens1q <- glm(formula = totalSpecimens
+                 ~ col + landArea + HDI + GPI + airDensity + officialEnglish, family = quasipoisson, data = countryClassS2)
+summary(modTotalSpecimens1q)
+1 - 389028/597802 # Pseudo R-squared
+Anova(modTotalSpecimens1q, type = c("II"), test.statistic = c("F"))
