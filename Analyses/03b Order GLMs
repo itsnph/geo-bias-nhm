@@ -1,0 +1,55 @@
+# Running GMLs for Order specimen counts and inventory completeness and additional datasets
+# Noah Hearne
+# June, 2021
+
+#---------------------------------
+
+## Redo for orders
+propOrderMammal <- read.csv(file = "Data/MammalOrderIC.csv")
+propOrderBird <- read.csv(file = "Data/BirdOrderIC.csv")
+dataHDI <- read.csv("Data/FinalDataWithZeros.csv") 
+
+propOrderBird <- propOrderBird[, c(1, 3, 4, 5, 6)]
+propOrderMammal <- propOrderMammal[, c(1, 3, 4, 5, 6)]
+dataHDI2 <- dataHDI[, c(1, 2, 3, 4, 13, 14, 17, 18, 19, 22, 23)]
+propOrderBird2 <- left_join(propOrderBird, dataHDI2, by = "countryCode")
+propOrderBird2 <- filter(propOrderBird2, birdOrderProp <= 1)
+propOrderMammal2 <- left_join(propOrderMammal, dataHDI2, by = "countryCode")
+propOrderMammal2 <- filter(propOrderMammal2, mammalOrderProp <= 1)
+
+## Are these biases related to the colonial history of the countries from which specimens in the collections originate?
+modMamOrder <- glm(formula = cbind(orderMammals, mammalOrderRichness - orderMammals)
+                   ~ col +  landArea + orderName, family = binomial, data = propOrderMammal2)
+summary(modMamOrder)
+
+modBirdOrder <- glm(formula = cbind(orderBirds, birdOrderRichness - orderBirds)
+                    ~ col + landArea + orderName, family = binomial, data = propOrderBird2)
+summary(modBirdOrder)
+
+# Fit with quasibinomial family
+modMamOrderq <- glm(formula = cbind(orderMammals, mammalOrderRichness - orderMammals)
+                    ~ col +  landArea + orderName, family = quasibinomial, data = propOrderMammal2)
+Anova(modMamOrderq, type = c("II"), test.statistic = c("F"))
+
+modBirdOrderq <- glm(formula = cbind(orderBirds, birdOrderRichness - orderBirds)
+                     ~ col + landArea + orderName, family = quasibinomial, data = propOrderBird2)
+Anova(modBirdOrderq, type = c("II"), test.statistic = c("F"))
+
+## Are these biases related to other factors, such as GDP, Global Peace Index, airport or road density? 
+modMamOrder1 <- glm(formula = cbind(orderMammals, mammalOrderRichness - orderMammals)
+                    ~ col + landArea + airDensity + roadDensity + officialEnglish + GPI + HDI + orderName, family = binomial, data = propOrderMammal2)
+summary(modMamOrder1)
+
+modBirdOrder1 <- glm(formula = cbind(orderBirds, birdOrderRichness - orderBirds)
+                     ~ col + landArea + airDensity + roadDensity + officialEnglish + GPI + HDI + orderName, family = binomial, data = propOrderBird2)
+summary(modBirdOrder1)
+
+# Fit with quasibinomial family
+modMamOrder1q <- glm(formula = cbind(orderMammals, mammalOrderRichness - orderMammals)
+                     ~ col + landArea + airDensity + roadDensity + officialEnglish + GPI + HDI + orderName, family = quasibinomial, data = propOrderMammal2)
+Anova(modMamOrder1q, type = c("II"), test.statistic = c("F"))
+
+modBirdOrder1q <- glm(formula = cbind(orderBirds, birdOrderRichness - orderBirds)
+                      ~ col + landArea + airDensity + roadDensity + officialEnglish + GPI + HDI + orderName, family = quasibinomial, data = propOrderBird2)
+Anova(modBirdOrder1q, type = c("II"), test.statistic = c("F"))
+
