@@ -1,0 +1,71 @@
+# Counting IUCN Data for Orders
+# Noah Hearne
+# June, 2021
+
+# Load libraries
+library(tidyverse)
+library(lubridate)
+library(purrr)
+library(taxize)
+
+#---------------------------------------------------------------
+# Read in the IUCN data
+#---------------------------------------------------------------
+
+# Mammals
+IUCN_m <- read_csv("Data/Country Species Richness/IUCN_Mammals/countries.csv")
+
+# Birds
+IUCN_b1 <- read_csv("Data/Country Species Richness/IUCN_Birds/countries1.csv")
+IUCN_b2 <- read_csv("Data/Country Species Richness/IUCN_Birds/countries2.csv")
+IUCN_b <- full_join(IUCN_b1, IUCN_b2)
+
+# Load in IUCN order taxonomy
+IUCN_bTax <- read_csv("Data/Country Species Richness/IUCN_Birds/taxonomy.csv")
+IUCN_bTax2 <- read_csv("Data/Country Species Richness/IUCN_Birds/redlist_species_data_4c65f9e0-392a-48d4-b187-11f00b971a2f/taxonomy.csv")
+IUCN_mTax <- read_csv("Data/Country Species Richness/IUCN_Mammals/taxonomy.csv")
+
+IUCN_bTax <- IUCN_bTax[, c(2, 6)]
+IUCN_bTax2 <- IUCN_bTax2[, c(2, 6)]
+IUCN_mTax <- IUCN_mTax[, c(2, 6)]
+
+IUCN_bTax <- rbind(IUCN_bTax, IUCN_bTax2) # Join the two taxonomy dataframes
+
+# Join with country richness
+IUCN_m <- left_join(IUCN_m, IUCN_mTax, by = "scientificName")
+IUCN_b <- left_join(IUCN_b, IUCN_bTax, by = "scientificName")
+IUCN_b <- IUCN_b[, c(3, 4, 10)]
+IUCN_m <- IUCN_m[, c(3, 4, 10)]
+
+# Count richness data
+IUCN_bC <- count(IUCN_b, code, orderName, name = "birdOrderRichness")
+IUCN_mC <- count(IUCN_m, code, orderName, name = "mammalOrderRichness")
+IUCN_bC$orderName <- str_to_title(IUCN_bC$orderName)
+IUCN_mC$orderName <- str_to_title(IUCN_mC$orderName)
+names(IUCN_bC)[names(IUCN_bC) == "code"] <- "countryCode"
+names(IUCN_mC)[names(IUCN_mC) == "code"] <- "countryCode"
+
+# Load in count data
+countryOrder <- read.csv("Data/MapData6.csv") 
+countryOrderM <- filter(countryOrder, class == "Mammals")
+countryOrderB <- filter(countryOrder, class == "Birds")
+
+# Change column names
+names(countryOrderM)[names(countryOrderM) == "order"] <- "orderName"
+names(countryOrderB)[names(countryOrderB) == "order"] <- "orderName"
+names(countryOrderM)[names(countryOrderM) == "species"] <- "orderMammals"
+names(countryOrderB)[names(countryOrderB) == "species"] <- "orderBirds"
+
+# Join by country code and order name
+countryOrderMC <- left_join(countryOrderM, IUCN_mC, by = c("countryCode" = "countryCode", "orderName" = "orderName"))
+countryOrderBC <- left_join(countryOrderB, IUCN_bC, by = c("countryCode" = "countryCode", "orderName" = "orderName"))
+
+# Calculate inventory completeness
+propOrderMammal <- transform(countryOrderMC, mammalOrderProp = orderMammals / mammalOrderRichness)
+propOrderBird <- transform(countryOrderBC, birdOrderProp = orderBirds / birdOrderRichness)
+
+#write_csv(propOrderMammal, file = "Data/MammalOrderIC.csv")
+#write_csv(propOrderBird, file = "Data/BirdOrderIC.csv")
+
+  
+  
