@@ -1,0 +1,229 @@
+# Counting specimens and species
+# Noah Hearne
+# April, 2021
+
+#----------------------------------------------------------------
+# Counting data for plotting and adding in extra datasets
+#----------------------------------------------------------------
+
+# Load cleaned data
+ds2 <- read.csv(file = "Data/CleanedData.csv") 
+
+# Get country codes and their counts of specimens
+countryCounts <- ds2 %>% count(countryCode, name = "specimens") # Adds column of counts named specimens
+countryNames <- read_csv("Data/Miscellaneous/Country-Names.csv") # This is the country names file from Wikipedia
+countryCounts <- full_join(countryCounts, countryNames, by = "countryCode") # This joins the counts with the names and codes, including rows with codes only in both
+#write_csv(countryCounts, file = "Data/CountryCountsforCodes.csv")
+
+# Get counts for each year
+years <- count(ds2, vars = year) # Counts the number of specimens for each year
+#decades <- count(ds2, vars = decade) # Counts the number of specimens for each decade
+
+# Counts of specimens per order for each country/continent/year
+countryOrder <- ds2 %>% count(countryCode, class, order, name = "specimens")
+countryOrderBird <- filter(countryOrder, class == "Birds") # Select only birds
+names(countryOrderBird)[names(countryOrderBird) == "specimens"] <- "birds"
+names(countryOrderBird)[names(countryOrderBird) == "order"] <- "birdOrder"
+countryOrderBird <- countryOrderBird[, c(1, 3, 4)]
+countryOrderMammal <- filter(countryOrder, class == "Mammals") # Select only mammals
+names(countryOrderMammal)[names(countryOrderMammal) == "specimens"] <- "mammals"
+names(countryOrderMammal)[names(countryOrderMammal) == "order"] <- "mammalOrder"
+countryOrderMammal <- countryOrderMammal[, c(1, 3, 4)]
+# write_csv(countryOrder, file = "Data/MapData5.csv") 
+# write_csv(countryOrderBird, file = "Data/MapData3.csv") 
+# write_csv(countryOrderMammal, file = "Data/MapData4.csv") 
+
+
+# Count specimens per order per continent
+continentOrder <- ds2 %>% count(continent, order, name = "specimens")
+
+# Count specimens per order per year
+yearOrder <- ds2 %>% count(year, order, name = "specimens") %>% filter(!is.na(year))
+
+# Counts of specimens per class for each country/continent/year/decade
+countryClass <- ds2 %>% count(countryCode, class, name = "specimens")
+countryClass2 <- spread(countryClass, key = "class", value = "specimens") # Make bird and mammal columns
+countryClassS <- left_join(countryClass2, countryCounts, by = "countryCode")
+names(countryClassS)[names(countryClassS) == "specimens"] <- "totalSpecimens" # Rename columns
+names(countryClassS)[names(countryClassS) == "Birds"] <- "birdSpecimens"
+names(countryClassS)[names(countryClassS) == "Mammals"] <- "mammalSpecimens"
+countryClassS <- countryClassS[, c(1, 2, 3, 4)] 
+countryClassS <- countryClassS %>% # Make NAs zeros
+  mutate(birdSpecimens = coalesce(birdSpecimens, 0),
+         mammalSpecimens = coalesce(mammalSpecimens, 0)) # Ready for specimen models
+# write_csv(countryClassS, file = "Data/SpecModZ.csv") # Write data for maps (file: 02), specimen models (file: 03), counting percents below
+
+# Count specimens per class per continent/year/decade
+continentClass <- ds2 %>% count(continent, class, name = "specimens")
+yearClass <- ds2 %>% count(year, class, name = "specimens") %>% filter(!is.na(year))
+decadeClass <- ds2 %>% count(decade, class, name = "specimens") %>% filter(!is.na(year))
+
+# Counts of specimens per country/continent for each year
+countryYear <- ds2 %>% count(countryCode, year, name = "specimens") %>% filter(!is.na(year))
+continentYear <- ds2 %>% count(continent, year, name = "specimens") %>% filter(!is.na(year)) %>% filter(!is.na(continent))
+#write_csv(countryYear, file = "Data/AnimatedYear.csv") # Write data for animated map
+
+# Counts of specimens per country/continent for each year for each class
+countryYearClass <- ds2 %>% count(countryCode, class, year, name = "specimens") %>% filter(!is.na(year))
+#write_csv(countryYearClass, file = "Data/AnimatedYear.csv") # Write data for animated map
+
+# Counts of specimens per country/continent for each decade
+countryDecade <- ds2 %>% count(countryCode, decade, name = "specimens") %>% filter(!is.na(year))
+continentDecade <- ds2 %>% count(continent, decade, name = "specimens") %>% filter(!is.na(year)) %>% filter(!is.na(continent))
+
+# Counts of specimens per order for each country/continent/year (with class for splitting data for maps)
+countryClassOrder <- ds2 %>% count(countryCode, order, class, name = "specimens")
+
+# Count number of species per country
+countrySpeciesCounts <- ds2 %>% count(countryCode, binomial, class, order, name = "species")
+countrySpeciesClass <- ds2 %>% count(countryCode, binomial, class, name = "species")
+countrySpeciesClass <- countrySpeciesClass %>% count(countryCode, class, name = "species")
+# write_csv(countrySpeciesClass, file = "Data/CleanedSpeciesData.csv") # Data for inventory completeness models, onto adding extra datasets
+
+# Count number of species per order per country
+countrySpeciesCounts <- ds2 %>% count(countryCode, binomial, class, order, name = "species")
+countrySpeciesOrder <- countrySpeciesCounts %>% count(countryCode, class, order, name = "species")
+#write_csv(countrySpeciesOrder, file = "Data/MapData6.csv") 
+
+# Count number of species per continent
+continentSpecimenCounts <- ds2 %>% count(continent, name = "specimen")
+continentSpeciesCounts <- ds2 %>% count(continent, binomial, name = "specimen")
+continentSpeciesCounts <- continentSpeciesCounts %>% count(continent, name = "species")
+
+#continents <- select(ds2, countryCode, continent)
+#countryNames <- read_csv("Data/Miscellaneous/Country-Names.csv")
+#continents <- left_join(continents, countryNames, by = "countryCode") # This joins the counts with the names and codes, including rows with codes only in both
+#continents <- unique(continents)
+#continents <- filter(continents, !is.na(continent))
+#write_csv(continents, file = "Data/continents.csv") # Get list of continents to see what is missing
+Continents <- read_csv("Data/continents.csv") # Load in continents per country with missing continents
+continents <- select(ds2, countryCode, continent, binomial)
+countryNames <- read_csv("Data/Miscellaneous/Country-Names.csv")
+continents <- left_join(continents, countryNames, by = "countryCode") # This joins the counts with the names and codes, including rows with codes only in both
+continents <- filter(continents, !is.na(continent) | !is.na(countryCode)) # I have specimens with countries and no continent and vice versa
+
+#continents <- left_join(continents, Continents, by = "countryCode")
+
+continentSpecimenCounts <- continents %>% count(continent, name = "specimen")
+continentSpeciesCounts <- continents %>% count(continent, binomial, name = "specimen")
+continentSpeciesCounts <- continentSpeciesCounts %>% count(continent, name = "species")
+#write_csv(continentSpeciesCounts, file = "Data/ContinentSpecCounts.csv") # Use in file 01e
+
+countryContinentCounts <- continents %>% count(countryCode, binomial, name = "specimen")
+# write_csv(countryContinentCounts, file = "Data/ContinentCounts.csv") # Use in file 01e
+
+
+#----------------------------------------------------------------
+# Counting data to quantify spatial biases
+#----------------------------------------------------------------
+
+# Calculating percents to demonstrate spatial bias results
+maps <- read.csv("Data/SpecModZ.csv") # Load in country class data (exported above)
+names(maps)[names(maps) == "birdSpecimens"] <- "birds"
+names(maps)[names(maps) == "mammalSpecimens"] <- "mammals"
+names(maps)[names(maps) == "totalSpecimens"] <- "total"
+
+colPercent <- maps
+FA <- read.csv("Data/Country Land Area/FinalArea.csv") # Load in land area data
+colPercent2 <- left_join(FA, colPercent, by = "countryCode")
+colPercent2 <- filter(colPercent2, !is.na(col))
+colPercentTotal <- filter(colPercent2, !is.na(total))
+sum(colPercentTotal$total)
+sum(colPercentTotal$landArea)
+161597/253084 # = % of specimens from ex-colonies
+31090 / 253084 # = % of specimens from the UK
+
+24193000 / (4614362668 + 8345949507) # = % of land area of the UK
+
+1294/253084  # = % of specimens from the Russia
+1637687000 / (4614362668 + 8345949507) # = % of land area of the Russia
+
+colPercentYes <- filter(colPercent2, col == 1) # Select countries with British colonial history
+colPercentYes <- filter(colPercentYes, !is.na(total)) # Remove countries without specimen counts
+sum(colPercentYes$total)
+sum(colPercentYes$landArea)
+4614362668 / (4614362668 + 8345949507) # = % of land area from ex-colonies
+
+colPercentNo <- filter(colPercent2, col == 0) # Select countries without British colonial history
+colPercentNo <- filter(colPercentNo, !is.na(specimens)) # Remove countries without specimen counts
+sum(colPercentNo$specimens)
+sum(colPercentNo$landArea)
+8345949507 # = land area from non-colonies
+
+col10 <- filter(colPercent2, total > 4500) # Top 10 countries
+sum(col10$total)
+129002/253084 # % of total number of species from these 1o countries
+sum(col10$landArea)
+1 - (2541931000 / (4614362668 + 8345949507)) # % of land area of these 10 countries
+
+1 - (10/227) # Percentage of countries not included in the top 10
+
+
+#----------------------------------------------------------------
+# Counting name-bearing type specimens
+#----------------------------------------------------------------
+
+# Counting the number of types in the NHM from countries outside the British Isles
+countryTypes <- ds2 %>% count(countryCode, type, binomial, class, name = "specimens")
+countryTypes <- spread(countryTypes, key = "class", value = "specimens")
+countryTypes <- countryTypes %>% # Makes NAs zeros
+  mutate(Birds = coalesce(Birds, 0),
+         Mammals = coalesce(Mammals, 0))
+countryTypes <- transform(countryTypes, Combined = Birds + Mammals) # Get total specimens
+countryTypes <- filter(countryTypes, type == "Type") # Select only name-bearing types
+countryTypes <- filter(countryTypes, !is.na(countryCode))
+countryTypes <- countryTypes[, c(1, 4, 5, 6)]
+sum(countryTypes$Combined)
+countryTypes1 <- filter(countryTypes, countryCode != "GB" & countryCode != "IE" & countryCode != "IM")
+sum(countryTypes1$Combined)
+4208/4250 # % of types not from the British Isles
+
+# Counting the number of types in the NHM of species non-native to the British Isles
+# Load in IUCN species data
+# Mammals
+IUCN_m <- read_csv("Data/Country Species Richness/IUCN_Mammals/countries.csv")
+
+# Birds
+IUCN_b1 <- read_csv("Data/Country Species Richness/IUCN_Birds/countries1.csv")
+IUCN_b2 <- read_csv("Data/Country Species Richness/IUCN_Birds/countries2.csv")
+IUCN_b <- full_join(IUCN_b1, IUCN_b2)
+
+IUCN_Com <- full_join(IUCN_b, IUCN_m)
+IUCN_Com <- filter(IUCN_Com, code == "GB" | code == "IE" | code == "IM") # Remove British Isles
+IUCN_Com <- IUCN_Com[, c(3)] # Make dataframe a list of species from around the world
+IUCN_Com <- unique(IUCN_Com) # Remove any duplicates
+names(IUCN_Com)[names(IUCN_Com) == "scientificName"] <- "binomial"
+
+countryTypes2 <- ds2 %>% count(countryCode, type, binomial, class, name = "specimens")
+countryTypes2 <- anti_join(countryTypes2, IUCN_Com, by = "binomial") # Compare to species from British Isles, removing those native to them
+countryTypes2 <- filter(countryTypes2, type == "Type") # Filter for only name-bearing types
+countryTypes2 <- spread(countryTypes2, key = "class", value = "specimens")
+countryTypes2 <- countryTypes2 %>% # Make any NAs zeros
+  mutate(Birds = coalesce(Birds, 0),
+         Mammals = coalesce(Mammals, 0))
+countryTypes2 <- transform(countryTypes2, Combined = Birds + Mammals) # Create a combined column
+countryTypes2 <- filter(countryTypes2, !is.na(countryCode))
+countryTypes2 <- countryTypes2[, c(1, 4, 5, 6)]
+sum(countryTypes2$Combined) # Total number of type specimens in the NHM of species not found in the British Isles
+4002 / 4250
+
+typenumber <- filter(ds2, type == "Type") # Select name-bearing types
+typenumber <- filter(typenumber, !is.na(countryCode))
+typenumber <- count(typenumber, countryCode)
+
+# Counting the number of types per continent
+continents <- read.csv("Data/continents.csv") # Load in continent names for countries
+countryTypes3 <- ds2 %>% count(countryCode, type, binomial, class, name = "specimens") # Count the number of types per country
+countryTypes3 <- left_join(countryTypes3, continents, by = "countryCode") # Add continent names
+countryTypes3 <- spread(countryTypes3, key = "class", value = "specimens")
+countryTypes3 <- countryTypes3 %>% # Make all NAs zeros
+  mutate(Birds = coalesce(Birds, 0),
+         Mammals = coalesce(Mammals, 0))
+countryTypes3 <- transform(countryTypes3, Combined = Birds + Mammals) # Create combined column
+countryTypes3 <- filter(countryTypes3, type == "Type") # Filter for name-bearing types
+countryTypes3 <- filter(countryTypes3, !is.na(countryCode)) # Remove specimens wihtout country codes
+countryTypes3 <- filter(countryTypes3, !is.na(continent)) # Remove species without continents
+countryTypes3 <- countryTypes3[, c(4, 7)]
+countryTypes3 <- tapply(countryTypes3$Combined, countryTypes3$continent, FUN=sum) # Sum by continent
+countryTypes3 <- as.data.frame(countryTypes3) # Make a dataframe so easier to read
+
