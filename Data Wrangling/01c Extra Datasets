@@ -1,0 +1,169 @@
+# Adding in additional datasets
+# Noah Hearne
+# June, 2021
+
+# Load libraries
+library(tidyverse)
+library(lubridate)
+library(purrr)
+library(taxize)
+
+#---------------------------------------------------------------
+# Read in the IUCN data
+#---------------------------------------------------------------
+
+# Mammals
+#IUCN_m <- read_csv("Data/Country Species Richness/IUCN_Mammals/countries.csv")
+
+# Birds
+#IUCN_b1 <- read_csv("Data/Country Species Richness/IUCN_Birds/countries1.csv")
+#IUCN_b2 <- read_csv("Data/Country Species Richness/IUCN_Birds/countries2.csv")
+#IUCN_b <- full_join(IUCN_b1, IUCN_b2)
+
+
+#---------------------------------------------------------------
+# Count IUCN richness data
+#---------------------------------------------------------------
+
+# Mammals
+# countryMRichness <- IUCN_m %>% count(name, name = "mammalRichness") # Adds column of counts named specimens
+# write_csv(countryRichness, file = "Data/Country Species Richness/IUCN_m_richness.csv")  
+# write_csv(countryCounts, file = "Data/Country Species Richness/countryCounts.csv") # Export to match names to GBIF  
+
+countryCounts <- read_csv(file = "Data/Country Species Richness/countryCounts.csv")
+
+countryMRichness <- read_csv("Data/Country Species Richness/IUCN_m_richness.csv") # Import data for fixed names
+names(countryMRichness)[names(countryMRichness) == "name"] <- "countryName"
+countryMRichness <- full_join(countryCounts, countryMRichness, by = "countryName") # Adds country codes
+countryMRichness <- countryMRichness[, c(4, 5, 6)] # Remove specimen count
+
+# Birds
+# countryBRichness <- IUCN_b %>% count(name, name = "birdRichness") # Adds column of counts named specimens
+# write_csv(countryBRichness, file = "Data/Country Species Richness/IUCN_b_richness.csv") # Export to match names to GBIF  
+
+countryBRichness <- read_csv("Data/Country Species Richness/IUCN_b_richness.csv") # Import data for fixed namesnames(countryBRichness)[names(countryBRichness) == "name"] <- "countryName"
+names(countryBRichness)[names(countryBRichness) == "name"] <- "countryName"
+countryBRichness <- full_join(countryCounts, countryBRichness, by = "countryName")
+countryBRichness <- countryBRichness[, c(4, 5, 6)] # Remove specimen count
+
+#---------------------------------------------------------------
+# Join IUCN richness data with GBIF data
+#---------------------------------------------------------------
+
+countrySpeciesClass <- read_csv("Data/CleanedSpeciesData.csv") # Import cleaned NHM species numbers
+
+countryRichness <- full_join(countryMRichness, countryBRichness)
+
+countrySpeciesMammals <- filter(countrySpeciesClass, class == "Mammals") # Just get mammal counts
+names(countrySpeciesMammals)[names(countrySpeciesMammals) == "species"] <- "mammalSpecies" # Rename
+countrySpeciesMammals <- countrySpeciesMammals[, c(1, 3)] # Remove Class
+countrySpecies <- full_join(countrySpeciesMammals, countryRichness, by = "countryCode")
+
+countrySpeciesBirds <- filter(countrySpeciesClass, class == "Birds") # Just get mammal counts
+names(countrySpeciesBirds)[names(countrySpeciesBirds) == "species"] <- "birdSpecies" # Rename
+countrySpeciesBirds <- countrySpeciesBirds[, c(1, 3)] # Remove Class
+countrySpecies <- full_join(countrySpeciesBirds, countrySpecies, by = "countryCode")
+
+countrySpecies <- countrySpecies[, c(1, 4, 2, 6, 3, 5)]
+
+#---------------------------------------------------------------
+# Read in the UN surface area data
+#---------------------------------------------------------------
+
+#FAO <- read_csv("Data/Country Land Area/FAOSTAT_data_6-8-2021.csv")
+#FAO <- select(FAO, Area, Value) # Select just the columns we need
+#names(FAO)[names(FAO) == "Area"] <- "countryName"
+#names(FAO)[names(FAO) == "Value"] <- "landArea"
+#FAO$landArea <- FAO$landArea*1000 # Make units ha instead of 1000 ha
+#country <- full_join(countrySpecies, FAO, by = "countryName")
+# write_csv(country, file = "Data/Country_Area.csv") # Export to see what countries have different FAO names from GBIF names
+# write_csv(FAO, file = "Data/FAO.csv") # Export to be able to edit names after full join
+
+FAOCorrected <- read_csv("Data/Country Land Area/FAO.csv") # Import corrected names
+FAOCorrected$landArea <- FAOCorrected$landArea/100 # Make units km^2 instead of ha
+countrySpeciesArea <- full_join(countrySpecies, FAOCorrected, by = "countryName")
+countrySpeciesArea <- countrySpeciesArea[, c(1, 2, 7, 3, 4, 5, 6)]
+# write_csv(countrySpeciesArea, file = "Data/Country Land Area/Country_Area.csv") # Export to check names
+# Also, there are still some countries missing areas! World Factbook? (https://www.cia.gov/the-world-factbook/field/area/country-comparison)
+
+#---------------------------------------------------------------
+# Read in the COLDAT data
+#---------------------------------------------------------------
+ coldat <- read.csv("Data/COLDAT/COLDAT_Britain.csv") 
+ names(coldat)[names(coldat) == "country"] <- "countryName"
+ data <- full_join(coldat, countrySpeciesArea, by = "countryName")
+ data2 <- data[, c(1, 7, 8, 2, 3, 4, 5, 6, 9, 10, 11, 12)]
+# write_csv(data, file = "Data/SpeciesColdat2.csv") 
+
+ #---------------------------------------------------------------
+ # Read in the GDP data
+ #---------------------------------------------------------------
+  gdp <- read.csv("Data/GDP.csv")
+  cc3 <- read.csv("Data/countryCode3.csv")
+  datacc3 <- left_join(data2, cc3, by = "countryCode")
+  datagdp <- left_join(datacc3, gdp, by = "countryCode3")
+  
+#---------------------------------------------------------------
+# Read in the transport data
+#---------------------------------------------------------------
+  # airport <- read.csv("Data/airports.csv")
+  # roads <- read.csv("Data/roads.csv")
+  # transport <- full_join(airport, roads, by = "countryName")
+  # write_csv(transport, file = "Data/transport.csv") 
+  transport2 <- read.csv("Data/transport.csv") # Load corrected names
+  datatransport <- left_join(datagdp, transport2, by = "countryName")
+  datatransport$airports <- as.numeric((gsub(",", "", datatransport$airports)))
+  datatransport$roadways <- as.numeric((gsub(",", "", datatransport$roadways)))
+  
+  # write_csv(datatransport, file = "Data/datatransport.csv") 
+  
+#---------------------------------------------------------------
+# Read in the language data
+#---------------------------------------------------------------
+  english <- read.csv("Data/officialEnglish.csv")
+  datalang <- left_join(datatransport, english, by = "countryCode")
+  #write_csv(datalang, file = "Data/datalang.csv") # Edited in Excel, removed countries without colonial data and added in BOTs
+
+#---------------------------------------------------------------
+# Read in the GPI data
+#---------------------------------------------------------------  
+datal <- read.csv("Data/datalang.csv")    
+GPI <- read.csv("Data/GPI.csv")
+dataGPI <- left_join(datal, GPI, by = "countryCode3")
+
+#---------------------------------------------------------------
+# Read in the HDI data
+#---------------------------------------------------------------
+#HDI <- read.csv("Data/HDI.csv")
+#dataHDI <- full_join(dataGPI, HDI, by = "countryName")
+#write_csv(dataHDI, file = "Data/temptHDI.csv")
+
+HDI <- read.csv("Data/HDI.csv")
+dataHDI <- left_join(dataGPI, HDI, by = "countryName")
+
+#---------------------------------------------------------------
+# Get total/proportion species columns
+#--------------------------------------------------------------- 
+dataHDI <- dataHDI %>% # Make NAs zeros
+  mutate(birdSpecies = coalesce(birdSpecies, 0),
+         mammalSpecies = coalesce(mammalSpecies, 0))
+
+dataHDI <- transform(dataHDI, totalSpecies = birdSpecies + mammalSpecies)
+dataHDI <- transform(dataHDI, totalRichness = birdRichness + mammalRichness)
+dataHDI <- transform(dataHDI, roadDensity = roadways / landArea)
+dataHDI <- transform(dataHDI, airDensity = airports / landArea)
+# write_csv(dataHDI, file = "Data/FinalDataWithZeros2.csv") # With proportions, though models do not need this
+
+# Calculate inventory completeness of all countries for IC maps
+countrySpecies <- countrySpecies %>%
+  mutate(birdSpecies = coalesce(birdSpecies, 0),
+         mammalSpecies = coalesce(mammalSpecies, 0))
+#write_csv(countrySpecies, file = "Data/ICData.csv")
+
+countrySpecies <- read.csv("Data/ICData.csv")
+countrySpecies <- transform(countrySpecies, totalSpecies = birdSpecies + mammalSpecies)
+countrySpecies <- transform(countrySpecies, totalRichness = birdRichness + mammalRichness)
+countrySpecies <- transform(countrySpecies, totalProp = totalSpecies / totalRichness)
+countrySpecies <- transform(countrySpecies, birdProp = birdSpecies / birdRichness)
+countrySpecies <- transform(countrySpecies, mammalProp = mammalSpecies / mammalRichness)
+# write_csv(countrySpecies, file = "Data/ICMapData.csv")
