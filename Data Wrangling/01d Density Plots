@@ -1,0 +1,248 @@
+# Density plots to see distribution of specimens and inventory completeness
+# Noah Hearne
+# July, 2021
+
+#---------------------------------
+
+# Read in data
+maps <- read.csv("Data/SpecModZ.csv") # Read in specimen data
+maps <- filter(maps, !is.na(countryCode)) # Remove records with no country codes
+
+# Rename columns
+names(maps)[names(maps) == "birdSpecimens"] <- "birds"
+names(maps)[names(maps) == "mammalSpecimens"] <- "mammals"
+names(maps)[names(maps) == "totalSpecimens"] <- "total"
+
+# Create standard error function
+standard_error <- function(x) sd(x) / sqrt(length(x))
+
+# Select required columns
+meanData <- select(maps, total, birds, mammals)
+
+# Make density plots for specimen counts
+meanDensity1 <- ggplot(data = meanData, aes(x = log(birds))) + geom_density() +
+  labs(x="Log bird specimens", y = "Density") +
+  ylim(0, 0.175) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+meanDensity1
+
+meanDensity2 <- ggplot(data = meanData, aes(x = log(mammals))) + geom_density() +
+  labs(x="Log mammal specimens") +
+  ylim(0, 0.175) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+meanDensity2
+
+meanDensity3 <- ggplot(data = meanData, aes(x = log(total))) + geom_density() +
+  labs(x="Log combined specimens") +
+  ylim(0, 0.175) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+meanDensity3
+
+### Again, but for species (inventory completeness)
+maps2 <- read.csv("Data/ICMapData.csv") # Read in inventory completeness data
+maps2 <- filter(maps2, !is.na(countryCode)) # Remove row wihtout country code
+
+# Select necessary columns
+propMeanData <- select(maps2, countryCode, countryName, totalProp, birdProp, mammalProp)
+
+# Make density plots for inventory completeness
+meanDensity1p <- ggplot(data = propMeanData, aes(x = birdProp)) + geom_density() + # Density plot for bird inventory completeness
+  labs(x="Bird inventory completeness", y = "Density") +
+  ylim(0, 8) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+meanDensity1p
+
+meanDensity2p <- ggplot(data = propMeanData, aes(x = mammalProp)) + geom_density() + # Density plot for mammal inventory completeness
+  labs(x="Mammal inventory completeness") +
+  ylim(0, 8) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+meanDensity2p
+
+meanDensity3p <- ggplot(data = propMeanData, aes(x = totalProp)) + geom_density() + # Density plot for combined inventory completeness
+  labs(x="Combined inventory completeness") +
+  ylim(0, 8) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+meanDensity3p
+
+meanDensity <- ggarrange(meanDensity1,meanDensity1p, meanDensity2, meanDensity2p, meanDensity3, meanDensity3p,
+                         ncol = 2, nrow = 3) # Arrange all six plots today
+
+meanDensity <- annotate_figure(meanDensity, # Add y-axis tile
+                               left = text_grob("Density", rot = 90))
+meanDensity
+
+# Export
+# ggsave("Figures/speciesDensityZ.png", meanDensity, width = 17, height = 17, units = "cm")
+
+
+
+# Jitter plots for colonial history and inventory completeness
+dot <- select(dataHDI,countryCode, col, landArea, HDI, GPI, airDensity, officialEnglish, totalSpecies, totalRichness, birdSpecies, birdRichness, mammalSpecies, mammalRichness)
+dot$col <-ifelse(dot$col== 1, "Yes", "No") # Make (yes/no) into (1/0)
+dot$officialEnglish <-ifelse(dot$officialEnglish== 1, "Yes", "No") # Make (yes/no) into (1/0)
+
+dotCol1 <- ggplot(data = dot, aes(x = col, y = (birdSpecies / birdRichness))) +
+  geom_jitter(alpha = 0.8) +
+  stat_summary(fun = mean, geom="point", shape=18,
+               size=2.5, color="red") +
+  ggtitle("(a)") +
+  stat_summary(fun.data=mean_se, fun.args = list(mult=1), 
+               geom="errorbar", color="red", width=0.1, size = 0.5) +
+  xlab("Colonial history") + ylab("Bird inventory completeness") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank())
+dotCol1
+
+dotCol2 <- ggplot(data = dot, aes(x = col, y = (mammalSpecies / mammalRichness))) +
+  geom_jitter(alpha = 0.8) +
+  stat_summary(fun = mean, geom="point", shape=18,
+               size=2.5, color="red") +
+  ggtitle("(b)") +
+  stat_summary(fun.data=mean_se, fun.args = list(mult=1), 
+               geom="errorbar", color="red", width=0.1, size = 0.5) +
+  ylab("Mammal inventory completeness") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank())
+dotCol2
+
+dotCol3 <- ggplot(data = dot, aes(x = col, y = (totalSpecies / totalRichness))) +
+  geom_jitter(alpha = 0.8) +
+  stat_summary(fun = mean, geom="point", shape=18,
+               size=2.5, color="red") +
+  ggtitle("(c)") +
+  stat_summary(fun.data=mean_se, fun.args = list(mult=1), 
+               geom="errorbar", color="red", width=0.1, size = 0.5) +
+  xlab("Colonial history") + ylab("Combined inventory completeness") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank())
+dotCol3
+
+dotP <- ggarrange(dotCol1,dotCol2,dotCol3, # Arrange the plots
+                  ncol = 1, nrow = 3)
+
+dotP <- annotate_figure(dotP, left = text_grob("Inventory completeness", rot = 90), # Add y and x axis labels
+                        bottom = text_grob("Colonial history"))
+
+dotP
+
+#ggsave("Figures/dotPlotsZ.png", dotP, width = 15, height = 20, units = "cm")
+
+
+# Jitter plots for colonial history and specimen counts
+countryClassS <- read.csv(file = "Data/SpecModZ.csv") # Read in specimen counts
+countryClassS2 <- left_join(dataHDI, countryClassS, by = "countryCode")
+
+# Jitter plots for colonial history and specimen number
+dot2 <- select(countryClassS2,countryCode, col, landArea, HDI, GPI, airDensity, officialEnglish, birdSpecimens, mammalSpecimens, totalSpecimens)
+dot2$col <-ifelse(dot2$col== 1, "Yes", "No")
+dot2$officialEnglish <-ifelse(dot2$officialEnglish== 1, "Yes", "No")
+dot2
+
+dotCol4 <- ggplot(data = dot2, aes(x = col, y = log(birdSpecimens))) +
+  geom_jitter(alpha = 0.8) +
+  stat_summary(fun = mean, geom="point", shape=18,
+               size=2.5, color="red") +
+  ggtitle("(a)") +
+  stat_summary(fun.data=mean_se, fun.args = list(mult=1), 
+               geom="errorbar", color="red", width=0.1, size = 0.5) +
+  ylab("Bird specimens") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank())
+dotCol4
+
+dotCol5 <- ggplot(data = dot2, aes(x = col, y = log(mammalSpecimens))) +
+  geom_jitter(alpha = 0.8) +
+  stat_summary(fun = mean, geom="point", shape=18,
+               size=2.5, color="red") +
+  ggtitle("(b)") +
+  stat_summary(fun.data=mean_se, fun.args = list(mult=1), 
+               geom="errorbar", color="red", width=0.1, size = 0.5) +
+  ylab("Mammal specimens") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank())
+dotCol5
+
+dotCol6 <- ggplot(data = dot2, aes(x = col, y = log(totalSpecimens))) +
+  geom_jitter(alpha = 0.8) +
+  stat_summary(fun = mean, geom="point", shape=18,
+               size=2.5, color="red") +
+  ggtitle("(c)") +
+  stat_summary(fun.data=mean_se, fun.args = list(mult=1), 
+               geom="errorbar", color="red", width=0.1, size = 0.5) +
+  ylab("Combined specimens") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank())
+dotCol6
+
+dotP2 <- ggarrange(dotCol4,dotCol5,dotCol6, # Arrange plots
+                   ncol = 1, nrow = 3)
+
+dotP2 <- annotate_figure(dotP2, left = text_grob("Log specimens", rot = 90), # Add y and x axis labels
+                         bottom = text_grob("Colonial history"))
+
+dotP2
+
+# ggsave("Figures/dotPlots2Z.png", dotP2, width = 15, height = 20, units = "cm")
+
+
+
+#Dot plots for socio-political/economic factors against colonial history
+dotHDI <- ggplot(data = dot, aes(x = col, y = HDI)) +
+  geom_jitter() +
+  stat_summary(fun = mean, geom="point", shape=18,
+               size=2.5, color="red") +
+  stat_summary(fun.data=mean_se, fun.args = list(mult=1), 
+               geom="errorbar", color="red", width=0.1, size = 0.5) +
+  xlab("Colonial history") +
+  theme_bw()
+
+dotGPI <- ggplot(data = dot, aes(x = col, y = GPI)) +
+  geom_jitter() +
+  stat_summary(fun = mean, geom="point", shape=18,
+               size=2.5, color="red") +
+  stat_summary(fun.data=mean_se, fun.args = list(mult=1), 
+               geom="errorbar", color="red", width=0.1, size = 0.5) +
+  xlab("Colonial history") +
+  theme_bw()
+
+dotAD <- ggplot(data = dot, aes(x = col, y = log(airDensity))) +
+  geom_jitter() +
+  stat_summary(fun = mean, geom="point", shape=18,
+               size=2.5, color="red") +
+  stat_summary(fun.data=mean_se, fun.args = list(mult=1), 
+               geom="errorbar", color="red", width=0.1, size = 0.5) +
+  xlab("Colonial history") +
+  ylab("Log airport density") +
+  theme_bw()
+
+dotEO <- ggplot(data = subset(dot, !is.na(officialEnglish)), aes(x = col, fill = officialEnglish)) +
+  #geom_count() +
+  geom_bar(position = "fill") +
+  xlab("Colonial history") +
+  ylab("Proportion") +
+  labs(fill = "English as official language") +
+  theme_bw()
+dotEO
+
+dotEO2 <- ggplot(data = subset(dot, !is.na(officialEnglish)), aes(x = col, y = officialEnglish)) +
+  geom_count() +
+  xlab("Colonial history") +
+  ylab("Proportion") +
+  labs(fill = "English as official language") +
+  theme_bw()
+dotEO2
+
+dotSPE <- ggarrange(dotHDI,dotGPI,dotAD, dotEO, # Arrange plots
+                    ncol = 2, nrow = 2)
+dotSPE
+
+
+#ggsave("Figures/dotSPEZ.png", dotSPE, width = 25, height = 17, units = "cm") # This was used as the final figure
+
+
