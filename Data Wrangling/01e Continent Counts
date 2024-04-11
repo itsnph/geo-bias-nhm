@@ -1,0 +1,43 @@
+# Counting Species per Continent
+# Noah Hearne
+# August, 2021
+
+#---------------------------------
+
+# Load specimen counts
+countryCounts <- read_csv(file = "Data/Country Species Richness/countryCounts.csv") 
+
+# Load in species richness data
+countryMRichness <- read_csv("Data/Country Species Richness/IUCN_m_richness.csv") # Import data for fixed names
+names(countryMRichness)[names(countryMRichness) == "name"] <- "countryName"
+countryMRichness <- full_join(countryCounts, countryMRichness, by = "countryName") # Adds country codes
+countryMRichness <- countryMRichness[, c(4, 5, 6)] # Remove specimen count
+
+countryBRichness <- read_csv("Data/Country Species Richness/IUCN_b_richness.csv") # Import data for fixed names
+names(countryBRichness)[names(countryBRichness) == "name"] <- "countryName"
+countryBRichness <- full_join(countryCounts, countryBRichness, by = "countryName")
+countryBRichness <- countryBRichness[, c(4, 5, 6)] # Remove specimen count
+
+countryRichness <- full_join(countryMRichness, countryBRichness) # Join species richness data
+
+countryRichness <- transform(countryRichness, totalRichness = birdRichness + mammalRichness) # Calculate combined richness
+
+countryTotalRichness <- subset(countryRichness, select = -c(mammalRichness, birdRichness, countryName)) # Remove unneeded columns
+ 
+Continents <- read_csv("Data/continents.csv") # Load continent names
+countryContinentCounts <- read_csv("Data/ContinentCounts.csv") # Load counts per country
+countryTotalRichness <- left_join(countryTotalRichness, Continents, by = "countryCode")
+countryTotalRichness <- filter(countryTotalRichness, !is.na(continent)) # Remove data without continents 
+countryTotalRichness <- filter(countryTotalRichness, !is.na(totalRichness)) # Remove data wihtout country codes
+countryTotalRichness <- left_join(countryContinentCounts, countryTotalRichness, by = "countryCode")
+duplicated(countryTotalRichness$countryCode)
+
+countryTotalRichness <- subset(countryTotalRichness, select = -c(countryCode))
+countryTotalRichness2 <- aggregate(x = countryTotalRichness$totalRichness,# Sum by continent
+                                  by = list(Continent = countryTotalRichness$continent), 
+                                  FUN = sum)
+
+continentSpeciesCounts <- read_csv("Data/ContinentSpecCounts.csv")
+
+continentSpeciesCounts <- left_join(continentSpeciesCounts, countryTotalRichness, by = "countryCode")
+
